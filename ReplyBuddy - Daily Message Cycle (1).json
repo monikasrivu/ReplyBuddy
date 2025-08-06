@@ -1,0 +1,257 @@
+{
+  "name": "ReplyBuddy - Daily Message Cycle",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "01454215-f0ee-497e-bf36-e6b05034c983",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/15UQTecvHMCGHz3_l96qM_Y9pqimcIjqCbfyz9jslpAA/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "options": {
+          "outputFormatting": {
+            "values": {
+              "general": "UNFORMATTED_VALUE",
+              "date": "FORMATTED_STRING"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        224,
+        0
+      ],
+      "id": "b60564b2-d94c-44cf-861f-ad8335681890",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gpbz4YIooAaOJgC5",
+          "name": "Google Sheets account 6"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const messages = [\n  \"📩 Day 1: Welcome to ReplyBuddy! Let’s get started with your first tip.\",\n  \"📩 Day 2: Here’s your second tip. Stay consistent and take action!\",\n  \"📩 Day 3: You’re doing great! Here's tip #3 to help you grow.\",\n  \"📩 Day 4: Almost there! Today’s insight is a powerful one.\",\n  \"📩 Day 5: Final day! Here’s your last message – thanks for being with us!\"\n];\n\nconst output = [];\n\n$input.all().forEach(item => {\n  const user_id = item.json.user_id;\n  const row_number = Number(item.json.row_number);\n  const lastSentDay = Number(item.json.last_sent_day || \"0\");\n  const stoppedRaw = item.json.stopped;\n\n  const stopped = (stoppedRaw + \"\").toLowerCase();\n\n  // 🧪 Debug logs\n  console.log(\"User:\", user_id);\n  console.log(\"Last Sent Day:\", lastSentDay);\n  console.log(\"Stopped:\", stopped);\n\n  if (lastSentDay < 5 && stopped !== \"true\") {\n    output.push({\n      json: {\n        user_id,\n        row_number,\n        day: (lastSentDay + 1).toString(),\n        message: messages[lastSentDay] || \"Thanks again!\"\n      }\n    });\n  } else {\n    console.log(\"❌ Skipping user:\", user_id);\n  }\n});\n\nreturn output.length > 0\n  ? output\n  : [{ json: { error: \"❌ No users to send today. Check sheet values.\" } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "35cb18fd-a65f-4154-a113-17be4807b99f",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/762894796905015/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EAAKIwfprnykBPBWFmVxNkYUdz0toZB9u9Iy01Vdj7p7dJ3mPjzZASbHeNLVPHZC6Rh5XZBF3SW2mHRirZBKOKpwfBrR2SNeh1guEWxZClqKZAsCaQDLlfPeaGln1TVfitxO33yP0tNGzNaZAkrRfRqe80W5izuTiZBcGwm1XjZCbmjuRU702aXKj6DtkZBigxJKp3QZAoFAuNohgNLols8kefe3x86AamVisF32P8FjCr3NAVAZDZD"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{$json.user_id}}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{$json.message}}\"\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "c01235c8-6eef-4732-9045-280446687c22",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/15UQTecvHMCGHz3_l96qM_Y9pqimcIjqCbfyz9jslpAA/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Get row(s) in sheet').item.json.row_number }}",
+            "last_sent_day": "={{ $('Get row(s) in sheet').item.json.last_sent_day }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "stopped",
+              "displayName": "stopped",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_sent_day",
+              "displayName": "last_sent_day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        896,
+        0
+      ],
+      "id": "bd2c6148-f670-4269-ab3c-a176b8ff4b10",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gpbz4YIooAaOJgC5",
+          "name": "Google Sheets account 6"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "057d7836-5bda-43ba-90cc-958129e1e72b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cc3a980345ee53780666334fcb5875600f37fdae33d95950ac1bf8578b3148e3"
+  },
+  "id": "uBcsx3amCbFr50Lw",
+  "tags": []
+}
